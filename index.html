@@ -1,0 +1,530 @@
+<!DOCTYPE html>
+<html lang="fr">
+<head>
+<meta charset="utf-8">
+<meta name="viewport" content="width=device-width, initial-scale=1">
+<title>FLAIR prototype</title>
+<link rel="preconnect" href="https://fonts.googleapis.com">
+<link rel="preconnect" href="https://fonts.gstatic.com" crossorigin>
+<link href="https://fonts.googleapis.com/css2?family=Space+Grotesk:wght@500;600;700&family=Inter:wght@400;500;600;700&display=swap" rel="stylesheet">
+<style>
+/* VOICE everyday app with a game feel: a night investigation, calm and clear
+   IDEA a drone pilot's thermal ground station, lost-animal alerts and a field notebook
+   PICTURE the live thermal camera, large, with its HUD, the map of covered ground beside it
+   COLOUR night navy ground in both themes, thermal amber leads, hot red for alerts, mint for found
+   TYPE Space Grotesk for display and figures + Inter for text
+   LAYOUT laptop: camera 60 % with map, clues and animal card beside it; phone: camera, map, clues stacked */
+:root{color-scheme:dark;--bg:#0a0e18;--panel:#131a29;--panel2:#19223a;--line:#27324c;--ink:#eef2f8;--mut:#a3adc4;--amber:#ffb020;--hot:#ff5a3c;--mint:#3ddc97;--ice:#7cc4ff}
+*{box-sizing:border-box;min-width:0}
+[hidden]{display:none!important}
+html,body{margin:0}
+body{background:var(--bg);color:var(--ink);font:16px/1.5 Inter,system-ui,sans-serif;overflow-x:clip}
+h1,h2,h3{font-family:"Space Grotesk",Inter,sans-serif;line-height:1.08;letter-spacing:-.015em;margin:0;text-wrap:balance}
+h1{font-size:clamp(30px,4vw,44px)}
+h2{font-size:24px}
+h3{font-size:18px;margin-bottom:10px}
+p{margin:0}
+.wrap{max-width:1240px;margin:0 auto;padding:0 max(4vw,16px)}
+.top{border-bottom:1px solid var(--line);background:#0d1322}
+.bar{display:flex;flex-wrap:wrap;align-items:center;gap:10px 22px;padding-block:12px}
+.logo{display:flex;align-items:center;gap:10px;color:var(--ink);text-decoration:none;font:700 30px/1 "Space Grotesk",sans-serif;letter-spacing:.04em}
+.logo svg{width:34px;height:34px;flex:none}
+.tag{color:var(--mut);font-size:15px}
+nav{display:flex;flex-wrap:wrap;gap:6px;margin-left:auto}
+nav a{display:inline-flex;align-items:center;min-height:44px;padding:8px 16px;border-radius:999px;border:1px solid var(--line);color:var(--ink);text-decoration:none;font-weight:600}
+nav a:hover{background:var(--panel2)}
+nav a[aria-current=page]{background:var(--amber);border-color:var(--amber);color:#1a1205}
+a:focus-visible,button:focus-visible,canvas:focus-visible{outline:3px solid var(--ice);outline-offset:2px}
+main{padding-block:clamp(20px,3vw,32px) 40px}
+.screen{display:none}
+.screen.on{display:block}
+.head{margin-bottom:18px}
+.lead{color:var(--mut);font-size:17px;margin-top:8px;max-width:66ch}
+.note{color:var(--mut);font-size:14px;margin-top:14px}
+.card{background:var(--panel);border:1px solid var(--line);border-radius:16px;padding:16px}
+.btn{display:inline-flex;align-items:center;justify-content:center;gap:8px;min-height:44px;padding:10px 18px;border-radius:12px;border:1px solid var(--amber);background:var(--amber);color:#1a1205;font:600 16px Inter,sans-serif;cursor:pointer;text-decoration:none}
+.btn:hover{filter:brightness(1.07)}
+.btn.ghost{background:transparent;color:var(--amber)}
+.btn.small{min-height:40px;padding:8px 14px;font-size:15px}
+.alerts{display:grid;gap:16px;grid-template-columns:repeat(auto-fit,minmax(min(100%,320px),1fr))}
+.alert{display:grid;gap:12px;align-content:start}
+.alert .pic{height:150px;border-radius:12px;overflow:hidden;background:#05070d}
+.alert .pic canvas{width:100%;height:100%;display:block}
+.alert h2{display:flex;align-items:center;gap:10px;flex-wrap:wrap}
+.chip{display:inline-flex;align-items:center;font:600 13px Inter,sans-serif;padding:3px 10px;border-radius:999px;background:var(--panel2);color:var(--mut);white-space:nowrap}
+.chip.hot{background:rgba(255,90,60,.16);color:#ff8a70}
+.chip.ok{background:rgba(61,220,151,.15);color:var(--mint)}
+.meta{display:grid;grid-template-columns:auto 1fr;gap:4px 12px;font-size:15px}
+.meta dt{color:var(--mut)}
+.meta dd{margin:0}
+.mgrid{display:grid;gap:18px}
+@media(min-width:980px){.mgrid{grid-template-columns:minmax(0,1.6fr) minmax(300px,1fr);align-items:start}}
+.cam{position:relative;aspect-ratio:3/2;border-radius:16px;overflow:hidden;background:#000;border:1px solid var(--line);cursor:crosshair;touch-action:manipulation}
+.cam canvas{position:absolute;inset:0;width:100%;height:100%;display:block}
+.hud{position:absolute;font:600 13px/1 "Space Grotesk",monospace;color:#fff;background:rgba(0,0,0,.55);padding:6px 9px;border-radius:6px;pointer-events:none;white-space:nowrap;font-variant-numeric:tabular-nums}
+.hud.tl{left:10px;top:10px}.hud.tr{right:10px;top:10px}.hud.bl{left:10px;bottom:10px}.hud.br{right:10px;bottom:10px}
+.hud b{color:var(--amber)}
+.cross{position:absolute;left:50%;top:50%;width:46px;height:46px;transform:translate(-50%,-50%);pointer-events:none;border:1.5px solid rgba(255,255,255,.55);border-radius:50%}
+.cross::before,.cross::after{content:"";position:absolute;background:rgba(255,255,255,.55)}
+.cross::before{left:50%;top:-12px;bottom:-12px;width:1.5px;transform:translateX(-50%)}
+.cross::after{top:50%;left:-12px;right:-12px;height:1.5px;transform:translateY(-50%)}
+.idcard{position:absolute;left:50%;bottom:48px;transform:translateX(-50%);width:min(440px,calc(100% - 24px));background:rgba(13,19,34,.94);border:1px solid var(--line);border-radius:14px;padding:12px 14px;pointer-events:none}
+.idcard b{display:block;font:700 17px "Space Grotesk",sans-serif;margin-bottom:3px}
+.idcard.bad b{color:#ff8a70}.idcard.good b{color:var(--mint)}
+.idcard p{font-size:14px;color:#d6dcea}
+.idcard small{display:block;margin-top:6px;font-size:13px;color:var(--amber)}
+.found{position:absolute;inset:0;display:grid;place-items:center;background:rgba(5,8,14,.72);padding:16px;cursor:default}
+.found .box{background:var(--panel);border:1px solid var(--mint);border-radius:16px;padding:20px;max-width:440px;display:grid;gap:12px}
+.found h2{color:var(--mint)}
+.found .row{display:flex;flex-wrap:wrap;gap:8px}
+.ctrls{display:flex;flex-wrap:wrap;gap:10px;align-items:center;margin-top:12px}
+.hint{color:var(--mut);font-size:14px;flex:1 1 260px}
+.rules{margin-top:12px;font-size:14px;color:var(--mut);border:1px dashed var(--line);border-radius:12px;padding:10px 12px}
+.rules b{color:var(--ink)}
+.side{display:grid;gap:14px;align-content:start}
+.animal{display:grid;grid-template-columns:84px minmax(0,1fr);gap:14px;align-items:center}
+.animal svg{width:84px;height:84px;border-radius:14px;background:var(--panel2)}
+.animal p{font-size:14px;color:var(--mut)}
+.mini{position:relative;aspect-ratio:3/2;border-radius:12px;overflow:hidden;cursor:pointer;border:1px solid var(--line)}
+.mini canvas{position:absolute;inset:0;width:100%;height:100%;display:block}
+.stats{display:grid;grid-template-columns:repeat(3,minmax(0,1fr));gap:8px;margin-top:12px}
+.stat{background:var(--panel2);border-radius:10px;padding:8px 10px}
+.stat b{display:block;font:700 22px/1.1 "Space Grotesk",sans-serif;font-variant-numeric:tabular-nums;white-space:nowrap}
+.stat span{font-size:13px;color:var(--mut)}
+.bar2{height:6px;border-radius:3px;background:#0a0e18;margin-top:6px;overflow:hidden}
+.bar2 i{display:block;height:100%;background:var(--amber);width:0}
+.clues{list-style:none;margin:0;padding:0;display:grid;gap:8px}
+.clues li{display:grid;grid-template-columns:28px minmax(0,1fr);gap:10px;font-size:15px;background:var(--panel2);border-radius:10px;padding:10px}
+.clues li i{font:700 14px/28px "Space Grotesk",sans-serif;text-align:center;width:28px;height:28px;border-radius:50%;background:var(--amber);color:#1a1205;font-style:normal}
+.clues li.locked{color:var(--mut)}
+.clues li.locked i{background:var(--line);color:var(--mut)}
+.clues li.new{animation:pop .6s ease}
+@keyframes pop{from{transform:scale(.96);background:#3a2a08}to{transform:none}}
+@media(prefers-reduced-motion:reduce){.clues li.new{animation:none}}
+.cgrid{display:grid;gap:18px}
+@media(min-width:900px){.cgrid{grid-template-columns:minmax(0,1.2fr) minmax(0,1fr)}}
+.kpis{display:grid;grid-template-columns:repeat(auto-fit,minmax(9.5em,1fr));gap:12px;margin-bottom:18px}
+.kpi{background:var(--panel);border:1px solid var(--line);border-radius:14px;padding:14px 16px}
+.kpi b{display:block;font:700 clamp(30px,3.4vw,40px)/1.05 "Space Grotesk",sans-serif;color:var(--amber);font-variant-numeric:tabular-nums}
+.kpi span{color:var(--mut);font-size:14px}
+.badges{display:grid;grid-template-columns:repeat(auto-fit,minmax(min(100%,190px),1fr));gap:10px}
+.badge{display:grid;grid-template-columns:44px minmax(0,1fr);gap:12px;align-items:center;background:var(--panel2);border-radius:12px;padding:10px}
+.badge svg{width:44px;height:44px}
+.badge b{display:block;font-size:15px}
+.badge span{font-size:13px;color:var(--mut)}
+.badge.off{opacity:.45}
+.facts{list-style:none;margin:0;padding:0;display:grid;gap:8px}
+.facts li{background:var(--panel2);border-radius:10px;padding:10px 12px;font-size:15px}
+.facts li b{color:var(--amber)}
+.facts li.off{color:var(--mut);font-style:italic}
+footer{border-top:1px solid var(--line);color:var(--mut);font-size:14px;padding-block:16px}
+@media(max-width:600px){.tag{display:none}nav{margin-left:0;width:100%}nav a{flex:1 1 0;justify-content:center;padding:8px 10px}.hud{font-size:12px;padding:5px 7px}.idcard{bottom:40px}.stats{grid-template-columns:repeat(3,minmax(0,1fr))}.stat b{font-size:18px}}
+</style>
+</head>
+<body>
+<header class="top">
+  <div class="wrap bar">
+    <a class="logo" href="#alertes" aria-label="FLAIR, accueil">
+      <svg viewBox="0 0 34 34" aria-hidden="true"><circle cx="17" cy="17" r="16" fill="#ffb020"/><ellipse cx="17" cy="21" rx="6.5" ry="5.2" fill="#1a1205"/><circle cx="10" cy="14" r="2.6" fill="#1a1205"/><circle cx="14.5" cy="10" r="2.6" fill="#1a1205"/><circle cx="19.5" cy="10" r="2.6" fill="#1a1205"/><circle cx="24" cy="14" r="2.6" fill="#1a1205"/></svg>
+      FLAIR
+    </a>
+    <span class="tag">La curiosité qui ramène les animaux à la maison</span>
+    <nav aria-label="Écrans du prototype">
+      <a href="#alertes" data-s="alertes">Alertes</a>
+      <a href="#mission" data-s="mission">Mission</a>
+      <a href="#carnet" data-s="carnet">Mon carnet</a>
+    </nav>
+  </div>
+</header>
+
+<main>
+  <section class="screen" id="alertes">
+    <div class="wrap">
+      <div class="head">
+        <h1>3 animaux perdus attendent un pilote</h1>
+        <p class="lead">Choisis une enquête. Ton drone thermique décolle du dernier endroit où l’animal a été vu.</p>
+      </div>
+      <div class="alerts" id="a-list"></div>
+      <p class="note">Alertes fictives pour la démonstration. En France, 82 864 animaux ont été déclarés perdus en 2023, dont 62 330 chats (I-CAD).</p>
+    </div>
+  </section>
+
+  <section class="screen" id="mission">
+    <div class="wrap">
+      <div class="head">
+        <h1 id="m-title">Enquête</h1>
+        <p class="lead" id="m-sub"></p>
+      </div>
+      <div class="mgrid">
+        <div>
+          <div class="cam" id="cam-box">
+            <canvas id="cam" tabindex="0" aria-label="Caméra thermique du drone. Clique sur un point chaud pour l’identifier."></canvas>
+            <div class="hud tl"><b>THERMIQUE</b> · ALT 40 m</div>
+            <div class="hud tr" id="h-bat">Batterie 100 %</div>
+            <div class="hud bl" id="h-pos">X 0 · Y 0</div>
+            <div class="hud br" id="h-time">00:00</div>
+            <div class="cross"></div>
+            <div class="idcard" id="idcard" hidden></div>
+            <div class="found" id="found" hidden>
+              <div class="box">
+                <h2 id="f-title">Retrouvé !</h2>
+                <p id="f-text"></p>
+                <p class="note" style="margin:0">L’équipe au sol est prévenue. Point relais : Animalerie du Parc, partenaire FLAIR (exemple).</p>
+                <div class="row"><a class="btn" href="#carnet">Voir mon carnet</a><a class="btn ghost" href="#alertes">Nouvelle enquête</a></div>
+              </div>
+            </div>
+          </div>
+          <div class="ctrls">
+            <button class="btn small" id="b-pause" type="button">Pause</button>
+            <button class="btn small ghost" id="b-home" type="button">Retour au dernier lieu vu</button>
+            <span class="hint">Clique sur la carte pour déplacer le drone (ou flèches du clavier). Clique sur un point chaud de la caméra pour l’identifier.</span>
+          </div>
+          <p class="rules"><b>Règles de vol :</b> altitude 40 m, jamais à moins de 15 m d’un animal pour ne pas l’effrayer, vol en zone autorisée uniquement. Le drone repère, un humain récupère l’animal.</p>
+        </div>
+        <aside class="side">
+          <div class="card animal">
+            <svg id="m-pic" viewBox="0 0 84 84" aria-hidden="true"></svg>
+            <div><h3 id="m-name" style="margin-bottom:4px"></h3><p id="m-desc"></p></div>
+          </div>
+          <div class="card">
+            <h3>Carte de la zone</h3>
+            <div class="mini" id="mini-box"><canvas id="mini" aria-label="Carte de la zone : clique pour envoyer le drone à cet endroit"></canvas></div>
+            <div class="stats">
+              <div class="stat"><b id="s-cov">0 %</b><span>zone couverte</span><div class="bar2"><i id="s-covbar"></i></div></div>
+              <div class="stat"><b id="s-false">0</b><span>fausses pistes</span></div>
+              <div class="stat"><b id="s-bat">100 %</b><span>batterie</span></div>
+            </div>
+          </div>
+          <div class="card">
+            <h3>Indices de l’enquête</h3>
+            <ol class="clues" id="clues"></ol>
+          </div>
+        </aside>
+      </div>
+    </div>
+  </section>
+
+  <section class="screen" id="carnet">
+    <div class="wrap">
+      <div class="head">
+        <h1>Mon carnet de curiosité</h1>
+        <p class="lead">Chaque enquête t’apprend quelque chose sur les animaux et sur l’image thermique. Tes badges et tes découvertes sont ici.</p>
+      </div>
+      <div class="kpis" id="k"></div>
+      <div class="cgrid">
+        <div class="card"><h2 style="margin-bottom:12px">Badges</h2><div class="badges" id="badges"></div></div>
+        <div class="card"><h2 style="margin-bottom:12px">Ce que j’ai découvert</h2><ul class="facts" id="facts"></ul></div>
+      </div>
+      <div class="card" style="margin-top:18px">
+        <h2 style="margin-bottom:8px">À ton rythme</h2>
+        <p class="lead" style="margin:0">Missions de 20 minutes maximum, bouton pause à tout moment, aucune donnée de santé demandée. FLAIR n’est pas un soin : c’est une activité concrète, utile et pleine de curiosité.</p>
+        <button class="btn small ghost" id="b-reset" type="button" style="margin-top:12px">Remettre le carnet à zéro</button>
+      </div>
+    </div>
+  </section>
+</main>
+<footer><div class="wrap">Prototype FLAIR · équipe CodeBreakers · images thermiques et alertes simulées.</div></footer>
+
+<script>
+{
+const $ = s => document.querySelector(s), $$ = s => [...document.querySelectorAll(s)];
+const clamp = (v, a, b) => Math.max(a, Math.min(b, v));
+const fmt = s => String(Math.floor(s / 60)).padStart(2, '0') + ':' + String(Math.floor(s % 60)).padStart(2, '0');
+
+/* ---------- données ---------- */
+const MISSIONS = [
+  { id: 'moka', name: 'Moka', sp: 'chat', fur: '#c98a3e', desc: 'Chat tigré de 3 ans, collier rouge, chat d’intérieur très peureux.', lost: 'il y a 6 h', place: 'Rue des Lilas, Annecy', prio: 'Nuit froide', ls: { x: 300, y: 420 }, park: [2, 0], seed: 11, rad: [90, 210],
+    clues: ['Un chat d’intérieur perdu reste souvent tout près de chez lui : commence dans un rayon de 200 m.', 'Un chat effrayé se cache en silence : haies, cabanons, dessous de voitures.', 'Compare les tailles : un chat est plus petit qu’un renard et plus grand qu’un hérisson.'] },
+  { id: 'rocky', name: 'Rocky', sp: 'chien', fur: '#b97a3a', desc: 'Beagle de 4 ans, collier bleu, a fui pendant l’orage.', lost: 'il y a 14 h', place: 'Parc du Pâquier, Annecy', prio: 'Pluie prévue', ls: { x: 980, y: 330 }, park: [2, 0], seed: 23, rad: [160, 330],
+    clues: ['Un chien qui fuit un orage peut parcourir une longue distance : élargis la zone.', 'Les chiens apeurés cherchent souvent un endroit calme et ouvert, comme un parc.', 'Un renard a presque la même taille : au zoom, cherche le collier bleu.'] },
+  { id: 'pixel', name: 'Pixel', sp: 'chat', fur: '#2a2a2a', desc: 'Chat noir de 2 ans, pucé, sorti par une fenêtre ouverte.', lost: 'il y a 2 jours', place: 'Quartier des Fins, Annecy', prio: 'Depuis 48 h', ls: { x: 640, y: 690 }, park: [0, 2], seed: 37, rad: [120, 260],
+    clues: ['Après deux jours, un chat a parfois changé de cachette : vise les abris abrités du vent.', 'La nuit, un corps chaud ressort très bien sur un sol froid : cherche les petits points nets.', 'Un chat du voisinage peut te tromper : au zoom, Pixel est entièrement noir.'] }
+];
+const FACTS = {
+  herisson: ['Hérisson', 'Le hérisson d’Europe est une espèce protégée en France, actif surtout la nuit.'],
+  renard: ['Renard', 'Le renard roux est souvent actif au crépuscule et la nuit, même en ville.'],
+  moteur: ['Moteur chaud', 'Un moteur reste chaud longtemps après l’arrêt : un piège classique en image thermique.'],
+  toit: ['Toit chauffé', 'Les toits mal isolés brillent en thermique : la chaleur de la maison s’échappe.'],
+  voisin: ['Chat du voisin', 'Beaucoup de chats sortent la nuit : toujours confirmer l’identité avant de prévenir l’équipe.'],
+  chat: ['Chat retrouvé', 'En 2023, 62 330 chats ont été déclarés perdus en France (I-CAD).'],
+  chien: ['Chien retrouvé', 'En 2023, 20 454 chiens ont été déclarés perdus en France (I-CAD).']
+};
+const BADGES = [
+  ['vol', 'Premier vol', 'Faire décoller ton drone'],
+  ['lynx', 'Œil de lynx', 'Éliminer 3 fausses pistes'],
+  ['methode', 'Enquêteur méthodique', 'Couvrir 40 % d’une zone'],
+  ['retrouvailles', 'Retrouvailles', 'Retrouver un animal'],
+  ['or', 'Flair d’or', 'Résoudre les 3 enquêtes']
+];
+const KEY = 'flair-demo';
+const fresh = () => ({ done: [], falses: 0, flight: 0, badges: [], facts: [] });
+let book = fresh();
+try { const s = JSON.parse(localStorage.getItem(KEY) || 'null'); if (s && Array.isArray(s.done)) book = Object.assign(fresh(), s); } catch (e) {}
+const save = () => { try { localStorage.setItem(KEY, JSON.stringify(book)); } catch (e) {} };
+const award = id => { if (!book.badges.includes(id)) { book.badges.push(id); save(); } };
+const learn = id => { if (!book.facts.includes(id)) { book.facts.push(id); save(); } };
+
+/* ---------- monde ---------- */
+const W = 1200, H = 800, S = 1, XS = [[0, 400], [436, 830], [866, 1200]], YS = [[0, 250], [286, 560], [596, 800]];
+const rng = seed => { let s = seed % 2147483647 || 1; return () => (s = s * 16807 % 2147483647) / 2147483647; };
+const inRect = (x, y, r, m = 0) => x > r.x - m && x < r.x + r.w + m && y > r.y - m && y < r.y + r.h + m;
+function genWorld(m) {
+  const r = rng(m.seed), w = { roads: [], houses: [], trees: [], hedges: [], sheds: [], cars: [], park: null, pond: null, animals: [] };
+  w.roads = [{ x: 0, y: 250, w: W, h: 36 }, { x: 0, y: 560, w: W, h: 36 }, { x: 400, y: 0, w: 36, h: H }, { x: 830, y: 0, w: 36, h: H }];
+  XS.forEach((xr, i) => YS.forEach((yr, j) => {
+    const b = { x: xr[0], y: yr[0], w: xr[1] - xr[0], h: yr[1] - yr[0] };
+    if (i === m.park[0] && j === m.park[1]) {
+      w.park = b; w.pond = { x: b.x + b.w * 0.62, y: b.y + b.h * 0.5, rx: 55, ry: 34 };
+      for (let k = 0; k < 26; k++) w.trees.push({ x: b.x + 15 + r() * (b.w - 30), y: b.y + 15 + r() * (b.h - 30), r: 10 + r() * 12 });
+      return;
+    }
+    const cols = Math.max(1, Math.floor((b.w - 20) / 120)), rows = Math.max(1, Math.floor((b.h - 20) / 115));
+    for (let cx = 0; cx < cols; cx++) for (let cy = 0; cy < rows; cy++) {
+      const cw = (b.w - 20) / cols, ch = (b.h - 20) / rows, gx = b.x + 10 + cx * cw, gy = b.y + 10 + cy * ch;
+      const hw = 56 + r() * 14, hh = 42 + r() * 10, hx = gx + 8 + r() * (cw - hw - 16), hy = gy + 6 + r() * (ch - hh - 30);
+      w.houses.push({ x: hx, y: hy, w: hw, h: hh, ch: { x: hx + hw * (0.2 + r() * 0.6), y: hy + hh * (0.25 + r() * 0.5) } });
+      w.hedges.push({ x: gx + 4, y: gy + ch - 10, w: cw - 8, h: 6 });
+      if (r() < 0.55) w.sheds.push({ x: gx + 6 + r() * (cw - 30), y: hy + hh + 8, w: 18, h: 13 });
+      for (let k = 0; k < 2; k++) if (r() < 0.7) w.trees.push({ x: gx + 10 + r() * (cw - 20), y: gy + ch - 24 - r() * 12, r: 8 + r() * 7 });
+    }
+  }));
+  for (let k = 0; k < 12; k++) {
+    const rd = w.roads[Math.floor(r() * 4)], hor = rd.w > rd.h;
+    const c = hor ? { x: 20 + r() * (W - 70), y: rd.y + (r() < 0.5 ? 3 : rd.h - 17), w: 30, h: 14 } : { x: rd.x + (r() < 0.5 ? 3 : rd.w - 17), y: 20 + r() * (H - 70), w: 14, h: 30 };
+    c.hot = k < 3; w.cars.push(c);
+  }
+  const blocked = (x, y) => w.animals.some(a => Math.hypot(a.x - x, a.y - y) < 70) || x < 10 || y < 10 || x > W - 10 || y > H - 10 || w.houses.some(h => inRect(x, y, h, 6)) || w.roads.some(d => inRect(x, y, d, -2)) || (w.pond && ((x - w.pond.x) / w.pond.rx) ** 2 + ((y - w.pond.y) / w.pond.ry) ** 2 < 1.2);
+  const place = (cx, cy, r0, r1) => { for (let t = 0; t < 400; t++) { const a = r() * 6.283, d = r0 + r() * (r1 - r0), x = cx + Math.cos(a) * d, y = cy + Math.sin(a) * d; if (!blocked(x, y)) return { x, y }; } return { x: cx + r1, y: cy }; };
+  const add = (kind, p, len, wid, temp) => w.animals.push(Object.assign({ kind, len, wid, temp, ang: r() * 3.14 }, p));
+  add('cible', place(m.ls.x, m.ls.y, m.rad[0], m.rad[1]), m.sp === 'chien' ? 24 : 15, m.sp === 'chien' ? 12 : 8, 228);
+  add('herisson', place(m.ls.x, m.ls.y, 60, 260), 9, 7, 176);
+  add('herisson', place(600, 400, 50, 400), 9, 7, 176);
+  add('renard', place(m.ls.x, m.ls.y, 120, 320), 22, 9, 214);
+  if (m.sp === 'chat') add('voisin', place(m.ls.x, m.ls.y, 70, 280), 14, 8, 222);
+  else add('renard', place(600, 300, 80, 420), 21, 9, 212);
+  return w;
+}
+
+/* ---------- rendu thermique et carte ---------- */
+const LUT = (() => {
+  const st = [[0, [0, 0, 6]], [0.18, [28, 10, 70]], [0.38, [120, 14, 112]], [0.58, [212, 52, 56]], [0.74, [246, 128, 22]], [0.88, [252, 212, 64]], [1, [255, 252, 232]]], l = new Uint8ClampedArray(256 * 3);
+  for (let i = 0; i < 256; i++) { const t = i / 255; let k = 0; while (k < st.length - 2 && t > st[k + 1][0]) k++; const [t0, c0] = st[k], [t1, c1] = st[k + 1], u = (t - t0) / (t1 - t0); for (let c = 0; c < 3; c++) l[i * 3 + c] = c0[c] + (c1[c] - c0[c]) * u; }
+  return l;
+})();
+const gray = v => `rgb(${v},${v},${v})`;
+function animalShape(g, a, scale) {
+  g.save(); g.translate(a.x, a.y); g.rotate(a.ang);
+  g.beginPath(); g.ellipse(0, 0, a.len / 2, a.wid / 2, 0, 0, 7); g.fill();
+  g.beginPath(); g.arc(a.len / 2, 0, a.wid * 0.45, 0, 7); g.fill();
+  if (a.kind === 'renard') { g.beginPath(); g.ellipse(-a.len / 2 - 6, 0, 8, 3, 0, 0, 7); g.fill(); }
+  g.restore();
+}
+function renderThermal(w) {
+  const c = document.createElement('canvas'); c.width = W * S; c.height = H * S;
+  const g = c.getContext('2d'); g.scale(S, S);
+  g.fillStyle = gray(40); g.fillRect(0, 0, W, H);
+  if (w.park) { g.fillStyle = gray(33); g.fillRect(w.park.x, w.park.y, w.park.w, w.park.h); g.fillStyle = gray(12); g.beginPath(); g.ellipse(w.pond.x, w.pond.y, w.pond.rx, w.pond.ry, 0, 0, 7); g.fill(); }
+  const r = rng(99);
+  for (let i = 0; i < 2600; i++) { const v = 34 + r() * 14; g.fillStyle = gray(Math.round(v)); g.fillRect(r() * W, r() * H, 3 + r() * 5, 3 + r() * 5); }
+  g.fillStyle = gray(60); w.roads.forEach(d => g.fillRect(d.x, d.y, d.w, d.h));
+  g.fillStyle = gray(50); w.hedges.forEach(h => g.fillRect(h.x, h.y, h.w, h.h));
+  g.fillStyle = gray(47); w.trees.forEach(t => { g.beginPath(); g.arc(t.x, t.y, t.r, 0, 7); g.fill(); });
+  w.houses.forEach(h => { g.fillStyle = gray(96); g.fillRect(h.x, h.y, h.w, h.h); g.fillStyle = gray(112); g.fillRect(h.x + 4, h.y + 4, h.w - 8, h.h - 8); g.fillStyle = gray(212); g.fillRect(h.ch.x - 4, h.ch.y - 4, 8, 8); });
+  g.fillStyle = gray(62); w.sheds.forEach(s => g.fillRect(s.x, s.y, s.w, s.h));
+  w.cars.forEach(k => { g.fillStyle = gray(54); g.fillRect(k.x, k.y, k.w, k.h); if (k.hot) { g.fillStyle = gray(170); const hor = k.w > k.h; g.fillRect(k.x + (hor ? k.w - 11 : 2), k.y + (hor ? 2 : k.h - 11), hor ? 9 : k.w - 4, hor ? k.h - 4 : 9); } });
+  w.animals.forEach(a => { g.fillStyle = gray(a.temp); animalShape(g, a); });
+  const b = document.createElement('canvas'); b.width = c.width; b.height = c.height;
+  const gb = b.getContext('2d'); gb.filter = 'blur(2px)'; gb.drawImage(c, 0, 0); gb.filter = 'none';
+  const img = gb.getImageData(0, 0, b.width, b.height), d = img.data;
+  for (let i = 0; i < d.length; i += 4) { const v = d[i] * 3; d[i] = LUT[v]; d[i + 1] = LUT[v + 1]; d[i + 2] = LUT[v + 2]; }
+  gb.putImageData(img, 0, 0);
+  return b;
+}
+function renderMap(w) {
+  const c = document.createElement('canvas'); c.width = W * S; c.height = H * S;
+  const g = c.getContext('2d'); g.scale(S, S);
+  g.fillStyle = '#c9d4bd'; g.fillRect(0, 0, W, H);
+  if (w.park) { g.fillStyle = '#a9cc8c'; g.fillRect(w.park.x, w.park.y, w.park.w, w.park.h); g.fillStyle = '#7fb3d9'; g.beginPath(); g.ellipse(w.pond.x, w.pond.y, w.pond.rx, w.pond.ry, 0, 0, 7); g.fill(); }
+  g.fillStyle = '#8a929e'; w.roads.forEach(d => g.fillRect(d.x, d.y, d.w, d.h));
+  g.fillStyle = '#6f9e62'; w.hedges.forEach(h => g.fillRect(h.x, h.y, h.w, h.h));
+  w.houses.forEach(h => { g.fillStyle = '#c4714f'; g.fillRect(h.x, h.y, h.w, h.h); g.fillStyle = '#d98b66'; g.fillRect(h.x, h.y, h.w, h.h / 2); });
+  g.fillStyle = '#a3845f'; w.sheds.forEach(s => g.fillRect(s.x, s.y, s.w, s.h));
+  g.fillStyle = '#4f8a4b'; w.trees.forEach(t => { g.beginPath(); g.arc(t.x, t.y, t.r, 0, 7); g.fill(); });
+  const cc = ['#e9e9e9', '#3b5bdb', '#c92a2a', '#2b2b2b', '#f08c00']; w.cars.forEach((k, i) => { g.fillStyle = cc[i % 5]; g.fillRect(k.x, k.y, k.w, k.h); });
+  return c;
+}
+function animalSvg(m) {
+  const f = m.fur, dog = m.sp === 'chien';
+  return dog ? `<rect width="84" height="84" fill="#19223a"/><ellipse cx="42" cy="50" rx="24" ry="20" fill="${f}"/><ellipse cx="22" cy="44" rx="8" ry="16" fill="#5b3a1a"/><ellipse cx="62" cy="44" rx="8" ry="16" fill="#5b3a1a"/><ellipse cx="42" cy="60" rx="12" ry="9" fill="#f1e3cf"/><circle cx="34" cy="46" r="3" fill="#111"/><circle cx="50" cy="46" r="3" fill="#111"/><ellipse cx="42" cy="56" rx="4" ry="3" fill="#111"/><rect x="28" y="68" width="28" height="5" rx="2" fill="#3b82f6"/>`
+    : `<rect width="84" height="84" fill="#19223a"/><path d="M20 30 26 12 36 26ZM64 30 58 12 48 26Z" fill="${f}"/><circle cx="42" cy="44" r="22" fill="${f}"/>${f !== '#2a2a2a' ? '<path d="M34 24h4M42 22v8M46 24h4M24 44h8M52 44h8" stroke="#8a5a22" stroke-width="3" stroke-linecap="round"/>' : ''}<circle cx="34" cy="42" r="3.5" fill="${f === '#2a2a2a' ? '#f5d142' : '#2f6b2f'}"/><circle cx="50" cy="42" r="3.5" fill="${f === '#2a2a2a' ? '#f5d142' : '#2f6b2f'}"/><path d="M39 52h6l-3 3z" fill="#e8a0a0"/>${f !== '#2a2a2a' ? '<rect x="28" y="64" width="28" height="5" rx="2" fill="#e03131"/>' : ''}`;
+}
+
+/* ---------- écran Alertes ---------- */
+function renderAlerts() {
+  $('#a-list').innerHTML = MISSIONS.map(m => {
+    const done = book.done.includes(m.id);
+    return `<article class="card alert"><div class="pic"><canvas data-prev="${m.id}" width="600" height="300" aria-label="Aperçu thermique de la zone de ${m.name}"></canvas></div>
+      <h2>${m.name} <span class="chip ${done ? 'ok' : 'hot'}">${done ? 'Retrouvé' : m.prio}</span></h2>
+      <p style="color:var(--mut)">${m.desc}</p>
+      <dl class="meta"><dt>Perdu</dt><dd>${m.lost}</dd><dt>Dernier lieu vu</dt><dd>${m.place}</dd><dt>Espèce</dt><dd>${m.sp === 'chat' ? 'Chat' : 'Chien'}</dd></dl>
+      <a class="btn" href="#mission" data-go="${m.id}">${done ? 'Rejouer l’enquête' : 'Lancer l’enquête'}</a></article>`;
+  }).join('');
+  $$('[data-prev]').forEach(cv => { const m = MISSIONS.find(x => x.id === cv.dataset.prev), th = thermalCache(m); const g = cv.getContext('2d'); g.drawImage(th, (m.ls.x - 300) * S, (m.ls.y - 150) * S, 600 * S, 300 * S, 0, 0, 600, 300); });
+  $$('[data-go]').forEach(a => a.addEventListener('click', () => startMission(a.dataset.go)));
+}
+const cache = {};
+function thermalCache(m) { if (!cache[m.id]) { const w = genWorld(m); cache[m.id] = { w, th: renderThermal(w), map: renderMap(w) }; } return cache[m.id].th; }
+
+/* ---------- mission ---------- */
+const COV = 40, GX = W / COV, GY = H / COV;
+let M = null;
+function startMission(id) {
+  const m = MISSIONS.find(x => x.id === id) || MISSIONS[0]; thermalCache(m);
+  M = { m, w: cache[m.id].w, th: cache[m.id].th, map: cache[m.id].map, x: m.ls.x, y: m.ls.y, tx: null, ty: null, t: 0, bat: 100, paused: false, found: false, cov: new Uint8Array(GX * GY), covN: 0, falses: [], clues: 1, keys: {}, id: null, idUntil: 0 };
+  $('#m-title').textContent = 'Enquête : ' + m.name;
+  $('#m-sub').textContent = `${m.sp === 'chat' ? 'Chat' : 'Chien'} perdu ${m.lost} · dernier lieu vu : ${m.place}`;
+  $('#m-name').textContent = m.name; $('#m-desc').textContent = m.desc; $('#m-pic').innerHTML = animalSvg(m);
+  $('#found').hidden = true; $('#idcard').hidden = true; $('#b-pause').textContent = 'Pause';
+  renderClues(-1); award('vol'); localStorage && 0;
+}
+function renderClues(fresh) {
+  if (!M) return;
+  $('#clues').innerHTML = M.m.clues.map((c, i) => i < M.clues ? `<li class="${i === fresh ? 'new' : ''}"><i>${i + 1}</i><span>${c}</span></li>` : `<li class="locked"><i>${i + 1}</i><span>Indice verrouillé : explore la zone pour le débloquer.</span></li>`).join('');
+}
+function identify(wx, wy) {
+  if (!M || M.found) return;
+  const w = M.w, hit = (() => {
+    let best = null, bd = 1e9;
+    w.animals.forEach(a => { const d = Math.hypot(a.x - wx, a.y - wy); if (d < a.len / 2 + 12 && d < bd) { bd = d; best = a; } });
+    if (best) return { type: best.kind, a: best };
+    const car = w.cars.find(k => inRect(wx, wy, k, 6)); if (car) return { type: car.hot ? 'moteur' : 'voiture' };
+    const h = w.houses.find(k => inRect(wx, wy, k, 2)); if (h) return { type: 'toit' };
+    return { type: 'rien' };
+  })();
+  const sp = M.m.sp, nm = M.m.name;
+  const T = {
+    cible: [`C’est ${nm} !`, sp === 'chat' ? `Taille et forme d’un chat. Au zoom : ${M.m.fur === '#2a2a2a' ? 'pelage entièrement noir' : 'pelage tigré et collier rouge'}.` : 'Taille d’un chien moyen, oreilles tombantes. Au zoom : collier bleu.', 'good'],
+    herisson: ['Hérisson : fausse piste', 'Trop petit, et il avance au ras du sol.', 'bad', 'herisson'],
+    renard: ['Renard : fausse piste', sp === 'chien' ? 'Même taille que Rocky, mais queue touffue et pas de collier.' : 'Trop grand pour un chat, avec une longue queue touffue.', 'bad', 'renard'],
+    voisin: ['Un chat… mais pas le bon', M.m.fur === '#2a2a2a' ? 'Au zoom : pelage noir et blanc. Pixel est entièrement noir.' : 'Au zoom : pelage noir et blanc, sans collier rouge.', 'bad', 'voisin'],
+    moteur: ['Moteur chaud : fausse piste', 'Forme rectangulaire à l’avant d’une voiture qui vient de rouler.', 'bad', 'moteur'],
+    voiture: ['Voiture froide', 'Rien de vivant ici, mais un animal peut se cacher dessous.', 'mid'],
+    toit: ['Toit chauffé', 'Forme carrée et grande : c’est la chaleur de la maison.', 'mid', 'toit'],
+    rien: ['Rien ici', 'Sol froid. Continue l’exploration.', 'mid']
+  }[hit.type];
+  if (hit.type === 'toit') learn('toit');
+  if (T[2] === 'bad') {
+    const key = hit.a ? hit.a.x.toFixed(0) + ',' + hit.a.y.toFixed(0) : hit.type + wx.toFixed(0);
+    if (!M.falses.some(f => f.k === key)) { M.falses.push({ k: key, x: hit.a ? hit.a.x : wx, y: hit.a ? hit.a.y : wy }); book.falses++; save(); if (book.falses >= 3) award('lynx'); }
+    learn(T[3]);
+  }
+  const card = $('#idcard'); card.className = 'idcard ' + T[2];
+  card.innerHTML = `<b>${T[0]}</b><p>${T[1]}</p>${T[3] && FACTS[T[3]] ? `<small>Nouveau dans ton carnet : ${FACTS[T[3]][0]}</small>` : ''}`;
+  card.hidden = false; M.idUntil = M.t + 5;
+  if (hit.type === 'cible') found(hit.a);
+}
+function found(a) {
+  M.found = true; M.hitTarget = a;
+  if (!book.done.includes(M.m.id)) book.done.push(M.m.id);
+  learn(M.m.sp); award('retrouvailles'); if (book.done.length >= 3) award('or'); save();
+  $('#f-title').textContent = `${M.m.name} est retrouvé !`;
+  $('#f-text').textContent = `Trouvé en ${fmt(M.t)} · zone couverte ${Math.round(M.covN / (GX * GY) * 100)} % · ${M.falses.length} fausse${M.falses.length > 1 ? 's' : ''} piste${M.falses.length > 1 ? 's' : ''} éliminée${M.falses.length > 1 ? 's' : ''}.`;
+  setTimeout(() => { if (M && M.found) { $('#found').hidden = false; $('#idcard').hidden = true; } }, 1400);
+}
+
+/* ---------- boucle ---------- */
+const cam = $('#cam'), cg = cam.getContext('2d'), mini = $('#mini'), mg = mini.getContext('2d');
+let cw = 0, ch = 0, mw = 0, mh = 0, dpr = 1;
+const roC = new ResizeObserver(() => { dpr = Math.min(2, devicePixelRatio || 1); const b = cam.getBoundingClientRect(); cw = b.width; ch = b.height; cam.width = Math.max(1, cw * dpr); cam.height = Math.max(1, ch * dpr); const c = mini.getBoundingClientRect(); mw = c.width; mh = c.height; mini.width = Math.max(1, mw * dpr); mini.height = Math.max(1, mh * dpr); });
+roC.observe(cam); roC.observe(mini);
+const VW = 260;
+function step(dt) {
+  if (!M || M.paused || M.found) return;
+  M.t += dt; M.bat = clamp(100 - M.t * 0.1, 3, 100); book.flight += dt;
+  let vx = 0, vy = 0; const k = M.keys;
+  if (k.ArrowLeft || k.a || k.q) vx -= 1; if (k.ArrowRight || k.d) vx += 1; if (k.ArrowUp || k.w || k.z) vy -= 1; if (k.ArrowDown || k.s) vy += 1;
+  const sp = 150;
+  if (vx || vy) { M.tx = null; const n = Math.hypot(vx, vy); M.x += vx / n * sp * dt; M.y += vy / n * sp * dt; }
+  else if (M.tx != null) { const dx = M.tx - M.x, dy = M.ty - M.y, d = Math.hypot(dx, dy); if (d < 3) M.tx = null; else { const s = Math.min(d, sp * dt); M.x += dx / d * s; M.y += dy / d * s; } }
+  M.x = clamp(M.x, 0, W); M.y = clamp(M.y, 0, H);
+  const vh = VW * (ch / cw || 0.66);
+  for (let gx = Math.floor((M.x - VW / 2) / COV); gx <= Math.floor((M.x + VW / 2) / COV); gx++) for (let gy = Math.floor((M.y - vh / 2) / COV); gy <= Math.floor((M.y + vh / 2) / COV); gy++) {
+    if (gx < 0 || gy < 0 || gx >= GX || gy >= GY) continue; const i = gy * GX + gx; if (!M.cov[i]) { M.cov[i] = 1; M.covN++; }
+  }
+  const cov = M.covN / (GX * GY);
+  if (cov >= 0.4) award('methode');
+  const need = [[0, 0], [0.16, 60], [0.32, 130]];
+  while (M.clues < 3 && (cov >= need[M.clues][0] || M.t >= need[M.clues][1])) { M.clues++; renderClues(M.clues - 1); }
+  if (M.idUntil && M.t > M.idUntil) { $('#idcard').hidden = true; M.idUntil = 0; }
+}
+function draw() {
+  if (!M || !cw) return;
+  const k = cw / VW, vh = ch / k;
+  cg.setTransform(dpr, 0, 0, dpr, 0, 0); cg.fillStyle = '#000'; cg.fillRect(0, 0, cw, ch);
+  cg.imageSmoothingEnabled = true;
+  cg.drawImage(M.th, (M.x - VW / 2) * S, (M.y - vh / 2) * S, VW * S, vh * S, 0, 0, cw, ch);
+  const toScr = (x, y) => [(x - M.x + VW / 2) * k, (y - M.y + vh / 2) * k];
+  cg.lineWidth = 2; cg.setLineDash([5, 4]); cg.strokeStyle = 'rgba(255,255,255,.75)';
+  M.falses.forEach(f => { const [sx, sy] = toScr(f.x, f.y); cg.beginPath(); cg.arc(sx, sy, 16, 0, 7); cg.stroke(); cg.font = '600 13px Inter'; cg.fillStyle = '#fff'; cg.fillText('×', sx + 13, sy - 12); });
+  cg.setLineDash([]);
+  if (M.found && M.hitTarget) { const [sx, sy] = toScr(M.hitTarget.x, M.hitTarget.y); cg.strokeStyle = '#3ddc97'; cg.lineWidth = 3; cg.beginPath(); cg.arc(sx, sy, 22, 0, 7); cg.stroke(); }
+  const vg = cg.createRadialGradient(cw / 2, ch / 2, Math.min(cw, ch) * 0.35, cw / 2, ch / 2, Math.max(cw, ch) * 0.7); vg.addColorStop(0, 'rgba(0,0,0,0)'); vg.addColorStop(1, 'rgba(0,0,0,.55)'); cg.fillStyle = vg; cg.fillRect(0, 0, cw, ch);
+  mg.setTransform(dpr, 0, 0, dpr, 0, 0); const mk = mw / W;
+  mg.drawImage(M.map, 0, 0, mw, mh);
+  mg.fillStyle = 'rgba(255,176,32,.28)';
+  for (let i = 0; i < M.cov.length; i++) if (M.cov[i]) mg.fillRect((i % GX) * COV * mk, Math.floor(i / GX) * COV * mk, COV * mk + 0.5, COV * mk + 0.5);
+  const [lx, ly] = [M.m.ls.x * mk, M.m.ls.y * mk];
+  mg.fillStyle = '#ff5a3c'; mg.beginPath(); mg.arc(lx, ly - 8, 6, 0, 7); mg.fill(); mg.beginPath(); mg.moveTo(lx - 5, ly - 6); mg.lineTo(lx + 5, ly - 6); mg.lineTo(lx, ly + 2); mg.fill();
+  mg.strokeStyle = '#fff'; mg.lineWidth = 2; mg.strokeRect((M.x - VW / 2) * mk, (M.y - vh / 2) * mk, VW * mk, vh * mk);
+  mg.fillStyle = '#0a0e18'; mg.beginPath(); mg.arc(M.x * mk, M.y * mk, 5, 0, 7); mg.fill(); mg.strokeStyle = '#ffb020'; mg.stroke();
+  if (M.tx != null) { mg.setLineDash([4, 4]); mg.strokeStyle = '#fff'; mg.beginPath(); mg.moveTo(M.x * mk, M.y * mk); mg.lineTo(M.tx * mk, M.ty * mk); mg.stroke(); mg.setLineDash([]); }
+}
+function ui() {
+  if (!M) return;
+  const cov = Math.round(M.covN / (GX * GY) * 100), bat = Math.round(M.bat);
+  $('#h-time').textContent = fmt(M.t); $('#h-pos').textContent = `X ${Math.round(M.x)} · Y ${Math.round(M.y)}`;
+  $('#h-bat').textContent = `Batterie ${bat} %`; $('#s-bat').textContent = bat + ' %';
+  $('#s-cov').textContent = cov + ' %'; $('#s-covbar').style.width = cov + '%'; $('#s-false').textContent = M.falses.length;
+}
+cam.addEventListener('click', e => { if (!M) return; const b = cam.getBoundingClientRect(), k = cw / VW, vh = ch / k; identify(M.x - VW / 2 + (e.clientX - b.left) / k, M.y - vh / 2 + (e.clientY - b.top) / k); });
+mini.addEventListener('click', e => { if (!M || M.found) return; const b = mini.getBoundingClientRect(); M.tx = (e.clientX - b.left) / b.width * W; M.ty = (e.clientY - b.top) / b.height * H; });
+addEventListener('keydown', e => { if (cur !== 'mission' || !M) return; const k = e.key.length === 1 ? e.key.toLowerCase() : e.key; if (['ArrowLeft', 'ArrowRight', 'ArrowUp', 'ArrowDown'].includes(k)) e.preventDefault(); M.keys[k] = true; });
+addEventListener('keyup', e => { if (!M) return; const k = e.key.length === 1 ? e.key.toLowerCase() : e.key; M.keys[k] = false; });
+$('#b-pause').addEventListener('click', e => { if (!M) return; M.paused = !M.paused; e.currentTarget.textContent = M.paused ? 'Reprendre' : 'Pause'; });
+$('#b-home').addEventListener('click', () => { if (M && !M.found) { M.tx = M.m.ls.x; M.ty = M.m.ls.y; } });
+
+/* ---------- carnet ---------- */
+function renderBook() {
+  const min = Math.round(book.flight / 60);
+  $('#k').innerHTML = [[book.done.length, 'animaux retrouvés'], [book.falses, 'fausses pistes éliminées'], [min + ' min', 'de vol au total'], [book.badges.length + ' / ' + BADGES.length, 'badges débloqués']].map(([v, l]) => `<div class="kpi"><b>${v}</b><span>${l}</span></div>`).join('');
+  $('#badges').innerHTML = BADGES.map(([id, n, d]) => { const on = book.badges.includes(id); return `<div class="badge ${on ? '' : 'off'}"><svg viewBox="0 0 44 44" aria-hidden="true"><circle cx="22" cy="22" r="20" fill="${on ? '#ffb020' : '#27324c'}"/><path d="M22 10l3.5 7.5 8 1-6 5.5 1.6 8L22 28l-7.1 4 1.6-8-6-5.5 8-1z" fill="${on ? '#1a1205' : '#3b4766'}"/></svg><div><b>${n}</b><span>${on ? 'Débloqué' : d}</span></div></div>`; }).join('');
+  const ids = Object.keys(FACTS);
+  $('#facts').innerHTML = ids.map(id => book.facts.includes(id) ? `<li><b>${FACTS[id][0]} :</b> ${FACTS[id][1]}</li>` : `<li class="off">${FACTS[id][0]} : à découvrir pendant une enquête.</li>`).join('');
+}
+$('#b-reset').addEventListener('click', () => { book = fresh(); save(); renderBook(); renderAlerts(); });
+
+/* ---------- navigation ---------- */
+let cur = 'alertes';
+function route() {
+  const h = location.hash.slice(1); cur = ['alertes', 'mission', 'carnet'].includes(h) ? h : 'alertes';
+  if (cur === 'mission' && !M) startMission('moka');
+  $$('.screen').forEach(s => s.classList.toggle('on', s.id === cur));
+  $$('nav a').forEach(a => a.dataset.s === cur ? a.setAttribute('aria-current', 'page') : a.removeAttribute('aria-current'));
+  if (cur === 'alertes') renderAlerts();
+  if (cur === 'carnet') renderBook();
+}
+addEventListener('hashchange', () => { route(); scrollTo(0, 0); });
+window.claude?.hot?.snapshot?.(() => ({ book }));
+const start = data => {
+  if (data && data.book) book = Object.assign(fresh(), data.book);
+  route();
+  let last = performance.now(), ua = 0;
+  const frame = now => { const dt = Math.min(0.05, (now - last) / 1000); last = now; if (cur === 'mission') { step(dt); draw(); ua += dt; if (ua > 0.1) { ua = 0; ui(); } } requestAnimationFrame(frame); };
+  requestAnimationFrame(frame);
+  setInterval(save, 5000);
+};
+window.claude?.hot?.ready ? window.claude.hot.ready(start) : start(window.claude?.hot?.data ?? {});
+}
+</script>
+</body>
+</html>
